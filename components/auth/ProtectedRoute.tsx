@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import api from "@/lib/axios"; // Import file axios "thần thánh" vừa tạo
 
 export default function ProtectedRoute({
   children,
@@ -20,26 +21,17 @@ export default function ProtectedRoute({
       }
 
       try {
-        // Gửi "vòng tay" lên server để máy quét kiểm tra
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          },
-        );
+        // Gửi "vòng tay" lên server để máy quét kiểm tra.
+        // ĐIỂM ĂN TIỀN: Nếu token hết hạn, Axios Interceptor sẽ TỰ ĐỘNG xin token mới
+        // mà hàm này không hề hay biết. Nó chỉ biết kết quả cuối cùng là Thành công!
+        const response = await api.get("/api/v1/auth/me");
 
-        if (response.ok) {
+        if (response.data.success) {
           // Server xác nhận token xịn
           setIsLoading(false);
-        } else {
-          // Token giả hoặc hết hạn (401)
-          throw new Error("Token không hợp lệ");
         }
       } catch (error) {
+        // Chỉ lọt vào catch này khi cả Access Token VÀ Refresh Token đều thất bại
         // Dọn dẹp "balo" vì chứa đồ giả/hết hạn
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
