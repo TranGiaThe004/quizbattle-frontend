@@ -8,31 +8,60 @@ export default function ProtectedRoute({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const verifyToken = async () => {
+      const token = localStorage.getItem("access_token");
 
-    if (!token) {
-      router.push("/login");
-    } else {
-      setIsAuthenticated(true);
-      setIsChecking(false);
-    }
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      try {
+        // Gửi "vòng tay" lên server để máy quét kiểm tra
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (response.ok) {
+          // Server xác nhận token xịn
+          setIsLoading(false);
+        } else {
+          // Token giả hoặc hết hạn (401)
+          throw new Error("Token không hợp lệ");
+        }
+      } catch (error) {
+        // Dọn dẹp "balo" vì chứa đồ giả/hết hạn
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        router.push("/login");
+      }
+    };
+
+    verifyToken();
   }, [router]);
 
-  // Hiển thị màn hình chờ trong tích tắc lúc anh bảo vệ đang lục balo
-  if (isChecking || !isAuthenticated) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <p className="text-xl font-semibold text-gray-600">
-          Đang kiểm tra quyền truy cập...
-        </p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">
+            Đang xác thực tài khoản...
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Cho phép render nội dung trang web thực sự
   return <>{children}</>;
 }
