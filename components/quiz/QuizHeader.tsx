@@ -1,20 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { Play, Edit, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import EditQuizModal from "./EditQuizModal"; // NHÚNG MODAL
 
 interface QuizHeaderProps {
+  quizId: number | string; // Cần thêm quizId
   title: string;
   description: string;
   questionsCount: number;
   playsCount: string;
   image: string;
   category: string;
+  onEditSuccess: () => void; // Cần thêm hàm load lại data
 }
 
-export default function QuizHeader({ title, description, questionsCount, playsCount, image, category }: QuizHeaderProps) {
-  const router = useRouter(); // KHỞI TẠO ROUTER
+export default function QuizHeader({ quizId, title, description, questionsCount, playsCount, image, category, onEditSuccess }: QuizHeaderProps) {
+  const router = useRouter();
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   return (
     <section className="bg-white rounded-xl overflow-hidden shadow-md border border-outline-variant mb-8">
@@ -45,7 +50,6 @@ export default function QuizHeader({ title, description, questionsCount, playsCo
           </div>
 
           <div className="flex flex-col gap-3 w-full md:w-auto">
-            {/* GẮN LINK CHUYỂN TRANG CHO SPRINT 3 */}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => router.push('/rooms/create')} 
@@ -55,13 +59,22 @@ export default function QuizHeader({ title, description, questionsCount, playsCo
               Start Game
             </motion.button>
             
-            <button className="bg-surface-container-high text-on-surface font-bold px-8 py-3 rounded-xl border-2 border-outline hover:bg-surface-variant transition-all flex items-center justify-center gap-2">
+            {/* NÚT EDIT MỞ MODAL */}
+            <button 
+              onClick={() => setIsEditOpen(true)}
+              className="bg-surface-container-high text-on-surface font-bold px-8 py-3 rounded-xl border-2 border-outline hover:bg-surface-variant transition-all flex items-center justify-center gap-2"
+            >
               <Edit size={18} />
               Edit Quiz
             </button>
           </div>
         </div>
       </div>
+
+      <EditQuizModal 
+        quizId={quizId} initialTitle={title} initialDesc={description} 
+        isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} onSuccess={onEditSuccess} 
+      />
     </section>
   );
 }

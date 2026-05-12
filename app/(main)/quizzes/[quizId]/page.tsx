@@ -54,8 +54,14 @@ export default function QuizDetailPage() {
     <div className="lg:pl-64 pt-24 pb-12">
       <div className="max-w-4xl mx-auto px-6">
         <QuizHeader
-          title={quiz.title} description={quiz.description} questionsCount={quiz.questions.length}
-          playsCount="1.2k" category="General Knowledge" image="https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?q=80&w=2070&auto=format&fit=crop"
+          quizId={quiz.id}
+          title={quiz.title}
+          description={quiz.description}
+          questionsCount={quiz.questions.length}
+          playsCount="1.2k"
+          category="General Knowledge"
+          image="https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?q=80&w=2070&auto=format&fit=crop"
+          onEditSuccess={fetchQuizDetail}laysCount="1.2k" category="General Knowledge" image="https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?q=80&w=2070&auto=format&fit=crop"
         />
 
         <section>
