@@ -115,7 +115,7 @@ export default function QuizDetailPage() {
             <div className="flex flex-col gap-4">
               {/* Lặp qua danh sách câu hỏi thật từ API */}
               {quiz.questions.map((q, idx) => (
-                <QuestionCard key={q.id} question={q} index={idx} />
+                <QuestionCard key={q.id} question={q} index={idx} onDeleteSuccess={fetchQuizDetail} />
               ))}
             </div>
           )}
