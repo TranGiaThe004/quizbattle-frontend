@@ -18,25 +18,19 @@ export default function LobbyPage() {
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [error, setError] = useState("");
-  // Dùng useRef để giữ kết nối ws không bị re-render liên tục
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    // Lấy token để xin quyền vào phòng
     const token = localStorage.getItem("access_token");
     if (!token) {
       router.push("/login");
       return;
     }
 
-    // --- BẮT ĐẦU ĐOẠN CODE ĐÃ ĐƯỢC TỐI ƯU ---
-    // Khởi tạo kết nối WebSocket linh hoạt theo môi trường (Dev/Prod)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-    // Tự động chuyển đổi http:// thành ws:// hoặc https:// thành wss://
     const wsBaseUrl = apiUrl.replace(/^http/, 'ws'); 
     const wsUrl = `${wsBaseUrl}/ws/rooms/${roomCode}?token=${token}`;
-    // --- KẾT THÚC ĐOẠN CODE ĐÃ ĐƯỢC TỐI ƯU ---
-
+    
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -47,9 +41,14 @@ export default function LobbyPage() {
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
 
-      // Bắt sự kiện room_state từ Backend bắn về
       if (message.event === "room_state") {
         setPlayers(message.data.players);
+      } 
+      // [THÊM Ở SPRINT 4]: Nếu Server báo game đã start, đẩy tất cả sang trang Gameplay
+      else if (message.event === "game_started") {
+        // Lưu lại session_id vào localStorage để dùng nộp đáp án
+        localStorage.setItem("game_session_id", message.data.session_id);
+        router.push(`/rooms/${roomCode}/play`);
       }
     };
 
@@ -57,7 +56,6 @@ export default function LobbyPage() {
       setError("Mất kết nối tới máy chủ phòng chờ!");
     };
 
-    // Cleanup: Chạy khi người dùng chuyển trang hoặc đóng Component
     return () => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.close();
@@ -65,9 +63,18 @@ export default function LobbyPage() {
     };
   }, [roomCode, router]);
 
+  // [THÊM Ở SPRINT 4]: Hàm bắn event Start Game lên Server
+  const handleStartGame = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+              event: "start_game",
+              payload: {}
+          }));
+      }
+  };
+
   return (
     <div className="max-w-4xl mx-auto mt-10">
-      {/* Box Mã Phòng */}
       <div className="bg-primary-container rounded-3xl p-8 text-center shadow-lg mb-8 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
         <p className="text-on-primary-container font-bold uppercase tracking-widest mb-2">
@@ -87,7 +94,6 @@ export default function LobbyPage() {
         </div>
       )}
 
-      {/* Box Danh sách Người chơi */}
       <div className="bg-surface rounded-3xl shadow-md border-2 border-outline-variant p-6 md:p-8">
         <div className="flex items-center justify-between mb-8 pb-4 border-b-2 border-surface-container-high">
           <div className="flex items-center gap-3">
@@ -101,7 +107,6 @@ export default function LobbyPage() {
           </span>
         </div>
 
-        {/* Grid Avatar hiển thị realtime */}
         {players.length === 0 ? (
           <div className="text-center py-12 text-outline">
             <div className="w-16 h-16 border-4 border-t-primary border-surface-container-high rounded-full animate-spin mx-auto mb-4"></div>
@@ -128,9 +133,12 @@ export default function LobbyPage() {
         )}
       </div>
 
-      {/* Tạm thời hiển thị nút Start Game (Host mới thấy logic này sau) */}
       <div className="mt-8 text-center">
-        <button className="bg-secondary text-on-secondary btn-3d font-headline text-2xl px-12 py-5 rounded-2xl inline-flex items-center gap-3 w-full md:w-auto justify-center">
+        {/* [SỬA Ở SPRINT 4]: Gắn hàm handleStartGame vào nút */}
+        <button 
+           onClick={handleStartGame}
+           className="bg-secondary text-on-secondary btn-3d font-headline text-2xl px-12 py-5 rounded-2xl inline-flex items-center gap-3 w-full md:w-auto justify-center"
+        >
           <Play fill="currentColor" size={28} /> START BATTLE
         </button>
       </div>
