@@ -1,3 +1,4 @@
+// app/(main)/rooms/[code]/lobby/page.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -28,8 +29,14 @@ export default function LobbyPage() {
       return;
     }
 
-    // Khởi tạo kết nối WebSocket (Đổi URL cổng 8000 cho khớp backend của bạn)
-    const wsUrl = `ws://localhost:8000/ws/rooms/${roomCode}?token=${token}`;
+    // --- BẮT ĐẦU ĐOẠN CODE ĐÃ ĐƯỢC TỐI ƯU ---
+    // Khởi tạo kết nối WebSocket linh hoạt theo môi trường (Dev/Prod)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    // Tự động chuyển đổi http:// thành ws:// hoặc https:// thành wss://
+    const wsBaseUrl = apiUrl.replace(/^http/, 'ws'); 
+    const wsUrl = `${wsBaseUrl}/ws/rooms/${roomCode}?token=${token}`;
+    // --- KẾT THÚC ĐOẠN CODE ĐÃ ĐƯỢC TỐI ƯU ---
+
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
