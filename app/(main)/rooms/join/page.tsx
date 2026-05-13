@@ -1,3 +1,4 @@
+// app/(main)/rooms/join/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -15,8 +16,12 @@ export default function JoinRoomPage() {
     e.preventDefault();
     setError("");
 
-    if (!roomCode.trim()) {
-      setError("Vui lòng nhập mã phòng!");
+    // Xóa khoảng trắng và ép in hoa để an toàn
+    const code = roomCode.trim().toUpperCase();
+
+    // Bắt lỗi nếu chưa đủ 6 ký tự
+    if (!code || code.length < 6) {
+      setError("Vui lòng nhập đủ mã phòng 6 ký tự!");
       return;
     }
 
@@ -36,13 +41,13 @@ export default function JoinRoomPage() {
       // Gọi API tham gia phòng
       const response = await axios.post(
         `${apiUrl}/api/v1/rooms/join`,
-        { room_code: roomCode.toUpperCase() }, // Chuyển thành chữ hoa cho chuẩn
+        { room_code: code },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
       if (response.data.success) {
-        // Chuyển hướng thẳng vào Sảnh chờ
-        router.push(`/rooms/${roomCode.toUpperCase()}/lobby`);
+        // Chuyển hướng thẳng vào Sảnh chờ Lobby
+        router.push(`/rooms/${code}/lobby`);
       }
     } catch (err: any) {
       // Bắt lỗi từ Backend (Phòng không tồn tại, đang chơi...)
@@ -74,8 +79,9 @@ export default function JoinRoomPage() {
             <input
               type="text"
               value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value)}
-              placeholder="Nhập mã PIN tại đây"
+              // Ép kí tự viết hoa ngay khi người dùng gõ phím
+              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              placeholder="NHẬP MÃ PIN"
               className="w-full text-center text-3xl font-black tracking-[0.2em] uppercase text-gray-800 bg-gray-50 border-4 border-gray-200 rounded-2xl py-4 focus:border-blue-500 focus:bg-white focus:outline-none transition-all placeholder:text-gray-300 placeholder:text-xl placeholder:tracking-normal placeholder:font-bold"
               maxLength={6}
             />
@@ -91,7 +97,7 @@ export default function JoinRoomPage() {
             disabled={isLoading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xl py-4 rounded-2xl shadow-[0_6px_0_rgb(29,78,216)] hover:shadow-[0_4px_0_rgb(29,78,216)] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
           >
-            {isLoading ? "Đang kết nối..." : "VÀO PHÒNG NGAY"}{" "}
+            {isLoading ? "ĐANG KẾT NỐI..." : "VÀO PHÒNG NGAY"}{" "}
             <ArrowRight size={24} />
           </button>
         </form>

@@ -1,15 +1,13 @@
-// app/(main)/quizzes/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link"; // ĐÃ THÊM LẠI LINK
-import { useRouter } from "next/navigation"; // ĐÃ THÊM LẠI ROUTER
-import ConfirmModal from "@/components/ui/ConfirmModal"; // NẾU BẠN MUỐN DÙNG LẠI MODAL XÓA CỦA BẠN (Tùy chọn)
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import ConfirmModal from "@/components/ui/ConfirmModal"; 
 
 export default function QuizzesPage() {
   const router = useRouter();
   const [quizzes, setQuizzes] = useState<any[]>([]);
-  // Các state cho việc Xóa Quiz (để giữ lại chức năng của Leader ở Sprint 2)
   const [quizToDelete, setQuizToDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +20,6 @@ export default function QuizzesPage() {
     }
 
     try {
-      // ĐÃ SỬA URL ĐỘNG TỪ BIẾN MÔI TRƯỜNG
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       const response = await fetch(`${apiUrl}/api/v1/quizzes`, {
         headers: {
@@ -53,7 +50,6 @@ export default function QuizzesPage() {
     fetchQuizzes();
   }, []);
 
-  // HÀM XÓA QUIZ CỦA LEADER SPRINT 2
   const handleDelete = async () => {
       if (!quizToDelete) return;
       setIsDeleting(true);
@@ -79,15 +75,25 @@ export default function QuizzesPage() {
 
   return (
     <div className="p-10 max-w-4xl mx-auto pt-24">
-      {/* ĐÃ THÊM LẠI KHU VỰC HEADER CÓ NÚT TẠO QUIZ */}
-      <div className="flex justify-between items-center mb-8 pb-4 border-b-2">
+      {/* HEADER: ĐÃ THÊM NÚT JOIN ROOM */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 pb-4 border-b-2 gap-4">
         <h1 className="text-3xl font-bold font-headline">Danh sách Quiz</h1>
-        <button 
-           onClick={() => router.push('/quizzes/create')} 
-           className="bg-black text-white px-5 py-3 rounded-lg font-bold hover:bg-gray-800 transition-all shadow-md flex gap-2 items-center"
-        >
-           + Tạo Quiz mới
-        </button>
+        
+        <div className="flex gap-3">
+          <button 
+             onClick={() => router.push('/rooms/join')} 
+             className="bg-blue-600 text-white px-5 py-3 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-md flex gap-2 items-center"
+          >
+             ⌨️ Nhập mã PIN
+          </button>
+
+          <button 
+             onClick={() => router.push('/quizzes/create')} 
+             className="bg-black text-white px-5 py-3 rounded-lg font-bold hover:bg-gray-800 transition-all shadow-md flex gap-2 items-center"
+          >
+             + Tạo Quiz mới
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -102,19 +108,17 @@ export default function QuizzesPage() {
             key={quiz.id}
             className="border p-5 rounded-xl shadow-sm hover:shadow-md transition-shadow flex justify-between items-center"
           >
-            {/* THẺ LINK ĐỂ BẤM CHUYỂN SANG TRANG CHI TIẾT */}
             <Link href={`/quizzes/${quiz.id}`} className="flex-1 cursor-pointer">
                <h2 className="text-xl font-bold text-primary hover:underline">{quiz.title}</h2>
-               <p className="text-on-surface-variant mt-2 line-clamp-2">
+               <p className="text-gray-500 mt-2 line-clamp-2">
                  {quiz.description || "Không có mô tả"}
                </p>
             </Link>
             
-            {/* NÚT GỌI MODAL XÓA */}
             <div className="flex gap-2 ml-4 shrink-0">
                 <button 
                   onClick={(e) => {
-                     e.preventDefault(); // Ngăn sự kiện click Link
+                     e.preventDefault();
                      setQuizToDelete(quiz.id);
                   }} 
                   className="bg-red-50 text-red-500 font-bold px-4 py-2 rounded-lg hover:bg-red-100 transition-colors"
@@ -138,10 +142,6 @@ export default function QuizzesPage() {
         )}
       </div>
 
-      {/* NHÚNG MODAL CỦA LEADER NẾU CÓ */}
-      {/* Nếu components/ui/ConfirmModal.tsx của bạn chưa lỗi thì cứ giữ nguyên.
-         Nếu báo lỗi do thiếu thư viện/file thì bạn có thể thay thế bằng hàm `window.confirm` tiêu chuẩn của JS
-      */}
       <ConfirmModal 
           isOpen={quizToDelete !== null} 
           title="Xóa bộ Quiz?" 
