@@ -23,6 +23,13 @@ interface Result {
   correct_option_ids: number[];
 }
 
+// [THÊM Ở SPRINT 5]: Interface cho Bảng xếp hạng Live
+interface LeaderboardEntry {
+  user_id: number;
+  display_name: string;
+  score: number;
+}
+
 export default function PlayPage() {
   const params = useParams();
   const router = useRouter();
@@ -36,11 +43,13 @@ export default function PlayPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string>("");
   const [gameFinished, setGameFinished] = useState<boolean>(false);
+  
+  // [THÊM Ở SPRINT 5]: State lưu bảng xếp hạng live
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Mảng màu sắc phong cách Kahoot cho 4 đáp án
   const optionColors = [
     "bg-red-500 hover:bg-red-600 border-red-700",
     "bg-blue-500 hover:bg-blue-600 border-blue-700",
@@ -67,21 +76,21 @@ export default function PlayPage() {
       const message = JSON.parse(event.data);
       console.log("📥 Nhận từ Server:", message);
 
-      // SỰ KIỆN 1: BẮT ĐẦU CÂU HỎI
       if (message.event === "question_started") {
         setQuestion(message.payload);
         setHasSubmitted(false);
         setSelectedOptionId(null);
-        setResult(null); // Tắt màn hình kết quả cũ
+        setResult(null); 
       } 
-      // SỰ KIỆN 2: KẾT QUẢ CÂU HỎI
       else if (message.event === "question_result") {
         setResult(message.payload);
       } 
-      // SỰ KIỆN 3: KẾT THÚC GAME
+      // [THÊM Ở SPRINT 5]: Hứng sự kiện bảng xếp hạng cập nhật
+      else if (message.event === "leaderboard_updated") {
+        setLeaderboard(message.payload);
+      }
       else if (message.event === "game_finished") {
         setGameFinished(true);
-        // Chờ 3 giây rồi đẩy sang trang kết quả chung cuộc
         setTimeout(() => {
            router.push(`/rooms/${roomCode}/result`);
         }, 3000);
@@ -97,7 +106,7 @@ export default function PlayPage() {
     };
   }, [roomCode, router]);
 
-  // --- 2. LOGIC ĐỒNG HỒ ĐẾM NGƯỢC (TIMER) ---
+  // --- 2. LOGIC ĐỒNG HỒ ĐẾM NGƯỢC ---
   useEffect(() => {
     if (!question || result) {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -116,7 +125,7 @@ export default function PlayPage() {
       if (remainingMs <= 0 && timerRef.current) {
         clearInterval(timerRef.current);
       }
-    }, 100); // Cập nhật nhanh để thanh tiến trình mượt hơn
+    }, 100);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -131,11 +140,9 @@ export default function PlayPage() {
     const startAt = new Date(question.server_started_at).getTime();
     const responseTimeMs = Date.now() - startAt;
 
-    // Set state khóa nút
     setHasSubmitted(true);
     setSelectedOptionId(optionId);
 
-    // Bắn sự kiện lên Backend của Leader
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
@@ -151,7 +158,6 @@ export default function PlayPage() {
     }
   };
 
-  // --- GIAO DIỆN CHỜ TRƯỚC KHI CÓ CÂU HỎI ---
   if (!question) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -163,14 +169,11 @@ export default function PlayPage() {
     );
   }
 
-  // --- GIAO DIỆN GAMEPLAY CHÍNH ---
   const timerPercentage = (timeLeft / question.time_limit_seconds) * 100;
   const isCorrect = result ? result.correct_option_ids.includes(selectedOptionId || -1) : false;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col relative overflow-hidden">
-      
-      {/* 1. THANH THỜI GIAN (TIMER BAR) */}
       <div className="w-full h-4 bg-gray-200">
         <motion.div
           className={`h-full ${timeLeft <= 5 ? "bg-red-500" : "bg-blue-600"}`}
@@ -181,8 +184,6 @@ export default function PlayPage() {
       </div>
 
       <div className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 flex flex-col gap-6">
-        
-        {/* HEADER: Đếm ngược */}
         <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
            <span className="font-bold text-gray-500">Câu hỏi: {question.question_id}</span>
            <div className={`text-3xl font-black rounded-full w-16 h-16 flex items-center justify-center border-4 ${timeLeft <= 5 ? "text-red-500 border-red-500 animate-bounce" : "text-gray-700 border-gray-300"}`}>
@@ -190,29 +191,24 @@ export default function PlayPage() {
            </div>
         </div>
 
-        {/* 2. QUESTION CARD */}
         <div className="bg-white flex-1 min-h-[200px] flex items-center justify-center p-8 rounded-3xl shadow-md border-b-8 border-gray-200">
           <h1 className="text-3xl md:text-5xl font-bold text-center leading-tight">
             {question.question_text}
           </h1>
         </div>
 
-        {/* CẢNH BÁO LỖI NẾU CÓ */}
         {error && <div className="bg-red-100 text-red-600 p-2 rounded-lg text-center font-bold">{error}</div>}
 
-        {/* THÔNG BÁO CHỜ NGƯỜI KHÁC */}
         {hasSubmitted && !result && (
            <div className="text-center bg-blue-100 text-blue-700 p-4 rounded-xl font-bold animate-pulse">
               Đã gửi đáp án! Đang chờ những người chơi khác...
            </div>
         )}
 
-        {/* 3. ANSWER OPTIONS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[300px]">
           {question.options.map((opt, index) => {
             const bgColor = optionColors[index % optionColors.length];
             const isSelected = selectedOptionId === opt.id;
-            // Nếu đã chọn xong, làm mờ các đáp án không được chọn
             const opacityClass = hasSubmitted && !isSelected ? "opacity-50 scale-95" : "opacity-100";
 
             return (
@@ -229,14 +225,13 @@ export default function PlayPage() {
         </div>
       </div>
 
-      {/* 4. OVERLAY KẾT QUẢ KHI HẾT GIỜ (QUESTION RESULT) */}
       <AnimatePresence>
         {result && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            className={`absolute inset-0 z-50 flex flex-col items-center justify-center ${
+            className={`absolute inset-0 z-50 flex flex-col items-center justify-center p-4 ${
               !selectedOptionId
                 ? "bg-gray-800"
                 : isCorrect
@@ -244,38 +239,40 @@ export default function PlayPage() {
                 : "bg-red-600"
             }`}
           >
-            <h1 className="text-6xl md:text-8xl font-black text-white mb-6 drop-shadow-lg">
-              {!selectedOptionId
-                ? "HẾT GIỜ!"
-                : isCorrect
-                ? "CHÍNH XÁC!"
-                : "SAI RỒI!"}
+            <h1 className="text-5xl md:text-7xl font-black text-white mb-2 drop-shadow-lg text-center">
+              {!selectedOptionId ? "HẾT GIỜ!" : isCorrect ? "CHÍNH XÁC!" : "SAI RỒI!"}
             </h1>
-            <p className="text-2xl text-white font-bold mb-8">
+            <p className="text-xl text-white font-bold mb-6 text-center">
               {!selectedOptionId ? "Bạn chưa chọn đáp án nào" : (isCorrect ? "+ Điểm cho bạn!" : "Cố gắng ở câu sau nhé!")}
             </p>
             
-            {/* Hiển thị đáp án đúng để người chơi biết */}
-            <div className="bg-white/20 p-6 rounded-2xl backdrop-blur-md">
-               <h3 className="text-white font-bold mb-4 text-center">Đáp án đúng là:</h3>
-               <div className="flex gap-2">
-                 {question.options.filter(o => result.correct_option_ids.includes(o.id)).map(correctOpt => (
-                    <div key={correctOpt.id} className="bg-white text-black px-6 py-3 rounded-xl font-bold text-xl">
-                      {correctOpt.text}
+            {/* [THÊM Ở SPRINT 5]: HIỂN THỊ TOP 5 LEADERBOARD LIVE */}
+            {leaderboard.length > 0 && (
+              <div className="bg-black/30 backdrop-blur-md p-6 rounded-3xl w-full max-w-md shadow-2xl border border-white/20 mt-4">
+                <h3 className="text-white font-black text-2xl mb-4 text-center tracking-widest uppercase">
+                  Top 5 Hiện Tại
+                </h3>
+                <div className="flex flex-col gap-2">
+                  {leaderboard.slice(0, 5).map((player, idx) => (
+                    <div key={player.user_id} className="flex justify-between items-center bg-white/10 px-4 py-3 rounded-xl text-white">
+                      <span className="font-bold text-lg">
+                        <span className="inline-block w-6 text-yellow-300">{idx + 1}.</span> {player.display_name}
+                      </span>
+                      <span className="font-black text-lg bg-white/20 px-3 py-1 rounded-lg">{player.score}</span>
                     </div>
-                 ))}
-               </div>
-            </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
             {gameFinished && (
-               <div className="mt-12 text-white text-xl animate-pulse font-bold">
-                 Đang chuyển sang Bảng xếp hạng chung cuộc...
+               <div className="mt-8 text-white text-xl animate-pulse font-bold bg-black/50 px-6 py-3 rounded-full">
+                 Đang tải Bảng xếp hạng chung cuộc...
                </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }
