@@ -40,14 +40,19 @@ export default function LobbyPage() {
 
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
+      console.log("📥 [Lobby] Nhận từ Server:", message);
 
       if (message.event === "room_state") {
-        setPlayers(message.data.players);
+        setPlayers(message.data?.players || message.payload?.players || []);
       } 
-      // [THÊM Ở SPRINT 4]: Nếu Server báo game đã start, đẩy tất cả sang trang Gameplay
+      // [CẬP NHẬT SPRINT 5]: Hứng sự kiện game_started từ Trọng tài ảo
       else if (message.event === "game_started") {
-        // Lưu lại session_id vào localStorage để dùng nộp đáp án
-        localStorage.setItem("game_session_id", message.data.session_id);
+        // Lấy session_id (nếu có) để dự phòng, 
+        // Backend Sprint 5 đã tự handle session_id dựa vào room_code nên cái này chủ yếu để an toàn
+        const sessionId = message.payload?.session_id || message.data?.session_id;
+        if (sessionId) {
+            localStorage.setItem("game_session_id", sessionId);
+        }
         router.push(`/rooms/${roomCode}/play`);
       }
     };
@@ -63,14 +68,34 @@ export default function LobbyPage() {
     };
   }, [roomCode, router]);
 
-  // [THÊM Ở SPRINT 4]: Hàm bắn event Start Game lên Server
-  const handleStartGame = () => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-              event: "start_game",
-              payload: {}
-          }));
+  // [CẬP NHẬT Ở SPRINT 5]: Hàm bắn API Start Game lên Server (Thay vì WebSocket)
+  const handleStartGame = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      
+      const response = await fetch(`${apiUrl}/api/v1/rooms/${roomCode}/start`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+      
+      // Nếu API trả lỗi (VD: Không phải là Host bấm, Room không hợp lệ...)
+      if (!response.ok || !data.success) {
+         setError(data.message || data.detail || "Không thể bắt đầu game!");
       }
+      
+      // NẾU THÀNH CÔNG: Không cần dùng router.push() ở đây.
+      // API Backend sẽ tự động gọi asyncio.create_task(start_game_loop)
+      // Server sẽ bắn event "game_started" qua WebSocket và đẩy TOÀN BỘ player sang trang /play.
+      
+    } catch (err) {
+      setError("Lỗi kết nối đến máy chủ khi bắt đầu game!");
+    }
   };
 
   return (
@@ -89,7 +114,7 @@ export default function LobbyPage() {
       </div>
 
       {error && (
-        <div className="bg-error/20 text-error font-bold p-4 rounded-xl text-center mb-6">
+        <div className="bg-error/20 text-error font-bold p-4 rounded-xl text-center mb-6 animate-pulse">
           {error}
         </div>
       )}
@@ -134,7 +159,6 @@ export default function LobbyPage() {
       </div>
 
       <div className="mt-8 text-center">
-        {/* [SỬA Ở SPRINT 4]: Gắn hàm handleStartGame vào nút */}
         <button 
            onClick={handleStartGame}
            className="bg-secondary text-on-secondary btn-3d font-headline text-2xl px-12 py-5 rounded-2xl inline-flex items-center gap-3 w-full md:w-auto justify-center"
