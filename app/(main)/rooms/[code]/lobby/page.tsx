@@ -1,14 +1,21 @@
-// app/(main)/rooms/[code]/lobby/page.tsx
 "use client";
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Users, Copy, Play } from "lucide-react";
 import { motion } from "framer-motion";
+import ChatBox from "@/components/game/ChatBox"; // ĐẢM BẢO IMPORT ĐÚNG COMPONENT CHATBOX
 
 interface Player {
   id: number;
   name: string;
+}
+
+// Thêm Type cho Chat
+interface ChatMessage {
+  user_id: string;
+  display_name: string;
+  message: string;
 }
 
 export default function LobbyPage() {
@@ -20,6 +27,10 @@ export default function LobbyPage() {
   const [error, setError] = useState("");
   const wsRef = useRef<WebSocket | null>(null);
 
+  // === STATE CHO CHAT ===
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentUserDisplayName, setCurrentUserDisplayName] = useState("");
+
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -27,10 +38,15 @@ export default function LobbyPage() {
       return;
     }
 
+    // Lấy tên người dùng hiện tại để ChatBox biết tin nhắn nào là của mình (tùy chọn)
+    // Giả sử bạn có lưu display_name lúc đăng nhập, nếu không thì cứ để trống cũng không sao
+    const savedName = localStorage.getItem("display_name") || "Tôi";
+    setCurrentUserDisplayName(savedName);
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-    const wsBaseUrl = apiUrl.replace(/^http/, 'ws'); 
+    const wsBaseUrl = apiUrl.replace(/^http/, "ws");
     const wsUrl = `${wsBaseUrl}/ws/rooms/${roomCode}?token=${token}`;
-    
+
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -42,18 +58,25 @@ export default function LobbyPage() {
       const message = JSON.parse(event.data);
       console.log("📥 [Lobby] Nhận từ Server:", message);
 
-      if (message.event === "room_state") {
+      // Backend của bạn có thể trả về 'event' hoặc 'type', mình bao gộp cả 2 trường hợp
+      const eventType = message.event || message.type;
+
+      if (eventType === "room_state") {
         setPlayers(message.data?.players || message.payload?.players || []);
-      } 
-      // [CẬP NHẬT SPRINT 5]: Hứng sự kiện game_started từ Trọng tài ảo
-      else if (message.event === "game_started") {
-        // Lấy session_id (nếu có) để dự phòng, 
-        // Backend Sprint 5 đã tự handle session_id dựa vào room_code nên cái này chủ yếu để an toàn
-        const sessionId = message.payload?.session_id || message.data?.session_id;
+      } else if (eventType === "game_started") {
+        const sessionId =
+          message.payload?.session_id || message.data?.session_id;
         if (sessionId) {
-            localStorage.setItem("game_session_id", sessionId);
+          localStorage.setItem("game_session_id", sessionId);
         }
         router.push(`/rooms/${roomCode}/play`);
+      }
+      // [THÊM LOGIC BẮT SỰ KIỆN CHAT TỪ SERVER]
+      else if (eventType === "chat_message") {
+        const payload = message.payload || message.data;
+        if (payload) {
+          setChatMessages((prev) => [...prev, payload]);
+        }
       }
     };
 
@@ -62,44 +85,51 @@ export default function LobbyPage() {
     };
 
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
+      // Đóng đường ống bằng mọi giá dù nó đang ở trạng thái nào
+      ws.close();
     };
   }, [roomCode, router]);
 
-  // [CẬP NHẬT Ở SPRINT 5]: Hàm bắn API Start Game lên Server (Thay vì WebSocket)
+  // === HÀM GỬI TIN NHẮN CHAT QUA WEBSOCKET ===
+  // === HÀM GỬI TIN NHẮN CHAT QUA WEBSOCKET ===
+  const handleSendMessage = (msg: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const chatPayload = {
+        event: "send_chat", // DÙNG CHỮ 'event'
+        data: {
+          // DÙNG CHỮ 'data'
+          message: msg,
+        },
+      };
+      wsRef.current.send(JSON.stringify(chatPayload));
+    }
+  };
+
   const handleStartGame = async () => {
     try {
       const token = localStorage.getItem("access_token");
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      
+
       const response = await fetch(`${apiUrl}/api/v1/rooms/${roomCode}/start`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
 
       const data = await response.json();
-      
-      // Nếu API trả lỗi (VD: Không phải là Host bấm, Room không hợp lệ...)
+
       if (!response.ok || !data.success) {
-         setError(data.message || data.detail || "Không thể bắt đầu game!");
+        setError(data.message || data.detail || "Không thể bắt đầu game!");
       }
-      
-      // NẾU THÀNH CÔNG: Không cần dùng router.push() ở đây.
-      // API Backend sẽ tự động gọi asyncio.create_task(start_game_loop)
-      // Server sẽ bắn event "game_started" qua WebSocket và đẩy TOÀN BỘ player sang trang /play.
-      
     } catch (err) {
       setError("Lỗi kết nối đến máy chủ khi bắt đầu game!");
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto mt-10">
+    <div className="max-w-4xl mx-auto mt-10 relative min-h-[80vh]">
       <div className="bg-primary-container rounded-3xl p-8 text-center shadow-lg mb-8 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
         <p className="text-on-primary-container font-bold uppercase tracking-widest mb-2">
@@ -158,14 +188,21 @@ export default function LobbyPage() {
         )}
       </div>
 
-      <div className="mt-8 text-center">
-        <button 
-           onClick={handleStartGame}
-           className="bg-secondary text-on-secondary btn-3d font-headline text-2xl px-12 py-5 rounded-2xl inline-flex items-center gap-3 w-full md:w-auto justify-center"
+      <div className="mt-8 text-center pb-20">
+        <button
+          onClick={handleStartGame}
+          className="bg-secondary text-on-secondary btn-3d font-headline text-2xl px-12 py-5 rounded-2xl inline-flex items-center gap-3 w-full md:w-auto justify-center"
         >
           <Play fill="currentColor" size={28} /> START BATTLE
         </button>
       </div>
+
+      {/* COMPONENT CHAT BOX HIỂN THỊ Ở GÓC DƯỚI */}
+      <ChatBox
+        messages={chatMessages}
+        onSendMessage={handleSendMessage}
+        currentUserDisplayName={currentUserDisplayName}
+      />
     </div>
   );
 }
