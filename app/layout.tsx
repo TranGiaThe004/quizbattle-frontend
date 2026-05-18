@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AuthGuardian from "@/components/AuthGuardian";
 
 export const metadata: Metadata = {
   title: "QuizBattle",
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-surface text-on-surface antialiased min-h-screen">
-        {children}
+        <AuthGuardian> {children}</AuthGuardian>
       </body>
     </html>
   );

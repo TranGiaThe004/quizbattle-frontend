@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { fetchWithAuth } from "@/lib/fetchApi";
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -9,13 +10,16 @@ export default function LogoutButton() {
 
     if (refreshToken) {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/logout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+        await fetchWithAuth(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/logout`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ refresh_token: refreshToken }),
           },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
+        );
       } catch (error) {
         console.error("Lỗi khi kết nối tới server lúc đăng xuất:", error);
       }
