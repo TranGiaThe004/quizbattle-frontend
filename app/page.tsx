@@ -122,7 +122,8 @@ export default function HomePage() {
                   !isJoining && roomCode.trim() ? { scale: 1.02 } : {}
                 }
                 whileTap={
-                  !isJoining && roomCode.trim() ? { y: 6, shadow: "none" } : {}
+                  // [ĐÃ SỬA]: Đổi shadow thành boxShadow
+                  !isJoining && roomCode.trim() ? { y: 6, boxShadow: "none" } : {}
                 }
                 className={`w-full py-5 rounded-2xl flex items-center justify-center gap-3 font-display text-2xl font-black transition-all ${
                   !roomCode.trim()
@@ -246,7 +247,8 @@ export default function HomePage() {
                 </p>
                 <motion.button
                   onClick={() => router.push("/quizzes/create")}
-                  whileTap={{ y: 4, shadow: "none" }}
+                  // [ĐÃ SỬA]: Đổi shadow thành boxShadow
+                  whileTap={{ y: 4, boxShadow: "none" }}
                   className="bg-yellow-400 text-yellow-950 px-6 py-3 rounded-xl font-black shadow-[0px_4px_0px_0px_#b45309] hover:bg-yellow-500 transition-all"
                 >
                   Create Quiz Now

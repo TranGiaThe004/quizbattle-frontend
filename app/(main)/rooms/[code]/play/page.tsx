@@ -4,6 +4,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import ChatBox from "@/components/game/ChatBox"; // [THÊM]: Import ChatBox
 
 // --- CÁC INTERFACES KIỂU DỮ LIỆU ---
 interface Option {
@@ -23,11 +24,17 @@ interface Result {
   correct_option_ids: number[];
 }
 
-// [THÊM Ở SPRINT 5]: Interface cho Bảng xếp hạng Live
 interface LeaderboardEntry {
   user_id: number;
   display_name: string;
   score: number;
+}
+
+// [THÊM]: Interface cho Chat
+interface ChatMessage {
+  user_id: string;
+  display_name: string;
+  message: string;
 }
 
 export default function PlayPage() {
@@ -43,9 +50,11 @@ export default function PlayPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string>("");
   const [gameFinished, setGameFinished] = useState<boolean>(false);
-
-  // [THÊM Ở SPRINT 5]: State lưu bảng xếp hạng live
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+
+  // [THÊM]: State cho Chat
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentUserDisplayName, setCurrentUserDisplayName] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -65,6 +74,10 @@ export default function PlayPage() {
       return;
     }
 
+    // Lấy tên để ChatBox nhận diện tin nhắn của mình
+    const savedName = localStorage.getItem("display_name") || "Tôi";
+    setCurrentUserDisplayName(savedName);
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
     const wsBaseUrl = apiUrl.replace(/^http/, "ws");
     const wsUrl = `${wsBaseUrl}/ws/rooms/${roomCode}?token=${token}`;
@@ -74,24 +87,29 @@ export default function PlayPage() {
 
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      console.log("📥 Nhận từ Server:", message);
+      const eventType = message.event || message.type; // Tương thích cả 2 chữ
 
-      if (message.event === "question_started") {
+      if (eventType === "question_started") {
         setQuestion(message.payload);
         setHasSubmitted(false);
         setSelectedOptionId(null);
         setResult(null);
-      } else if (message.event === "question_result") {
+      } else if (eventType === "question_result") {
         setResult(message.payload);
-      }
-      // [THÊM Ở SPRINT 5]: Hứng sự kiện bảng xếp hạng cập nhật
-      else if (message.event === "leaderboard_updated") {
+      } else if (eventType === "leaderboard_updated") {
         setLeaderboard(message.payload);
-      } else if (message.event === "game_finished") {
+      } else if (eventType === "game_finished") {
         setGameFinished(true);
         setTimeout(() => {
           router.push(`/rooms/${roomCode}/result`);
         }, 3000);
+      } 
+      // [THÊM]: Bắt sự kiện Chat trong lúc chơi
+      else if (eventType === "chat_message") {
+        const payload = message.payload || message.data;
+        if (payload) {
+          setChatMessages((prev) => [...prev, payload]);
+        }
       }
     };
 
@@ -151,7 +169,19 @@ export default function PlayPage() {
             game_session_id: parseInt(gameSessionId || "0"),
             response_time_ms: responseTimeMs,
           },
-        }),
+        })
+      );
+    }
+  };
+
+  // [THÊM]: Hàm gửi tin nhắn Chat
+  const handleSendMessage = (msg: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          event: "send_chat",
+          data: { message: msg },
+        })
       );
     }
   };
@@ -170,9 +200,7 @@ export default function PlayPage() {
   }
 
   const timerPercentage = (timeLeft / question.time_limit_seconds) * 100;
-  const isCorrect = result
-    ? result.correct_option_ids.includes(selectedOptionId || -1)
-    : false;
+  const isCorrect = result ? result.correct_option_ids.includes(selectedOptionId || -1) : false;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col relative overflow-hidden">
@@ -185,14 +213,12 @@ export default function PlayPage() {
         />
       </div>
 
-      <div className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 flex flex-col gap-6">
+      <div className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 flex flex-col gap-6 pb-24">
         <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
           <span className="font-bold text-gray-500">
             Câu hỏi: {question.question_id}
           </span>
-          <div
-            className={`text-3xl font-black rounded-full w-16 h-16 flex items-center justify-center border-4 ${timeLeft <= 5 ? "text-red-500 border-red-500 animate-bounce" : "text-gray-700 border-gray-300"}`}
-          >
+          <div className={`text-3xl font-black rounded-full w-16 h-16 flex items-center justify-center border-4 ${timeLeft <= 5 ? "text-red-500 border-red-500 animate-bounce" : "text-gray-700 border-gray-300"}`}>
             {timeLeft}
           </div>
         </div>
@@ -219,10 +245,7 @@ export default function PlayPage() {
           {question.options.map((opt, index) => {
             const bgColor = optionColors[index % optionColors.length];
             const isSelected = selectedOptionId === opt.id;
-            const opacityClass =
-              hasSubmitted && !isSelected
-                ? "opacity-50 scale-95"
-                : "opacity-100";
+            const opacityClass = hasSubmitted && !isSelected ? "opacity-50 scale-95" : "opacity-100";
 
             return (
               <button
@@ -253,21 +276,12 @@ export default function PlayPage() {
             }`}
           >
             <h1 className="text-5xl md:text-7xl font-black text-white mb-2 drop-shadow-lg text-center">
-              {!selectedOptionId
-                ? "HẾT GIỜ!"
-                : isCorrect
-                  ? "CHÍNH XÁC!"
-                  : "SAI RỒI!"}
+              {!selectedOptionId ? "HẾT GIỜ!" : isCorrect ? "CHÍNH XÁC!" : "SAI RỒI!"}
             </h1>
             <p className="text-xl text-white font-bold mb-6 text-center">
-              {!selectedOptionId
-                ? "Bạn chưa chọn đáp án nào"
-                : isCorrect
-                  ? "+ Điểm cho bạn!"
-                  : "Cố gắng ở câu sau nhé!"}
+              {!selectedOptionId ? "Bạn chưa chọn đáp án nào" : isCorrect ? "+ Điểm cho bạn!" : "Cố gắng ở câu sau nhé!"}
             </p>
 
-            {/* [THÊM Ở SPRINT 5]: HIỂN THỊ TOP 5 LEADERBOARD LIVE */}
             {leaderboard.length > 0 && (
               <div className="bg-black/30 backdrop-blur-md p-6 rounded-3xl w-full max-w-md shadow-2xl border border-white/20 mt-4">
                 <h3 className="text-white font-black text-2xl mb-4 text-center tracking-widest uppercase">
@@ -275,15 +289,9 @@ export default function PlayPage() {
                 </h3>
                 <div className="flex flex-col gap-2">
                   {leaderboard.slice(0, 5).map((player, idx) => (
-                    <div
-                      key={player.user_id}
-                      className="flex justify-between items-center bg-white/10 px-4 py-3 rounded-xl text-white"
-                    >
+                    <div key={player.user_id} className="flex justify-between items-center bg-white/10 px-4 py-3 rounded-xl text-white">
                       <span className="font-bold text-lg">
-                        <span className="inline-block w-6 text-yellow-300">
-                          {idx + 1}.
-                        </span>{" "}
-                        {player.display_name}
+                        <span className="inline-block w-6 text-yellow-300">{idx + 1}.</span> {player.display_name}
                       </span>
                       <span className="font-black text-lg bg-white/20 px-3 py-1 rounded-lg">
                         {player.score}
@@ -302,6 +310,13 @@ export default function PlayPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* [THÊM]: COMPONENT CHATBOX CHO MÀN HÌNH CHƠI */}
+      <ChatBox
+        messages={chatMessages}
+        onSendMessage={handleSendMessage}
+        currentUserDisplayName={currentUserDisplayName}
+      />
     </div>
   );
 }

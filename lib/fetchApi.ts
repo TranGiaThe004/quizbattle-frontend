@@ -1,12 +1,12 @@
-// utils/fetchApi.ts
+// lib/fetchApi.ts
 
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   let accessToken = localStorage.getItem("access_token");
 
-  // Tự động nhét Access Token vào Header
-  const headers: HeadersInit = {
+  // [ĐÃ SỬA TẠI ĐÂY]: Ép kiểu Record<string, string> để TypeScript 100% không báo lỗi
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
 
   if (accessToken) {
