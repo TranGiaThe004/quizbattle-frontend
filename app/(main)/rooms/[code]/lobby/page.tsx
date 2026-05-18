@@ -105,7 +105,7 @@ export default function LobbyPage() {
         <p className="text-on-primary-container font-bold uppercase tracking-widest mb-2">
           Room Code
         </p>
-        <h1 className="text-6xl md:text-8xl font-black font-headline tracking-tighter text-primary drop-shadow-sm">
+        <h1 className="text-5xl md:text-8xl font-black font-headline tracking-tighter text-primary drop-shadow-sm">
           {roomCode}
         </h1>
         <button className="mt-6 flex items-center justify-center gap-2 mx-auto bg-white/50 hover:bg-white px-6 py-3 rounded-full font-bold text-primary transition-all backdrop-blur-sm">
@@ -158,7 +158,7 @@ export default function LobbyPage() {
         )}
       </div>
 
-      <div className="mt-8 text-center">
+    <div className="mt-8 text-center pb-32 md:pb-20">
         <button 
            onClick={handleStartGame}
            className="bg-secondary text-on-secondary btn-3d font-headline text-2xl px-12 py-5 rounded-2xl inline-flex items-center gap-3 w-full md:w-auto justify-center"

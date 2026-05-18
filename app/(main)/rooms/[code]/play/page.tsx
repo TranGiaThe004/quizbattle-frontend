@@ -192,7 +192,7 @@ export default function PlayPage() {
         </div>
 
         <div className="bg-white flex-1 min-h-[200px] flex items-center justify-center p-8 rounded-3xl shadow-md border-b-8 border-gray-200">
-          <h1 className="text-3xl md:text-5xl font-bold text-center leading-tight">
+         <h1 className="text-xl md:text-5xl font-bold text-center leading-tight">
             {question.question_text}
           </h1>
         </div>
@@ -205,7 +205,7 @@ export default function PlayPage() {
            </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[300px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 min-h-[300px]">
           {question.options.map((opt, index) => {
             const bgColor = optionColors[index % optionColors.length];
             const isSelected = selectedOptionId === opt.id;
@@ -216,7 +216,7 @@ export default function PlayPage() {
                 key={opt.id}
                 onClick={() => handleSelectOption(opt.id)}
                 disabled={hasSubmitted || result !== null}
-                className={`${bgColor} ${opacityClass} text-white text-2xl md:text-4xl font-bold rounded-2xl border-b-8 active:border-b-0 active:translate-y-2 transition-all p-6 flex items-center justify-center shadow-md`}
+              className={`${bgColor} ${opacityClass} text-white text-lg md:text-4xl font-bold rounded-2xl border-b-8 active:border-b-0 active:translate-y-2 transition-all p-4 md:p-6 flex items-center justify-center shadow-md`}
               >
                 {opt.text}
               </button>
