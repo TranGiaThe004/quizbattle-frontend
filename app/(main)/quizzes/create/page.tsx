@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,9 @@ import {
   Globe,
   ListFilter,
   ToggleRight,
+  Menu,
+  X,
+  Settings,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchWithAuth } from "@/lib/fetchApi";
@@ -33,7 +36,7 @@ interface Question {
   number: number;
   text: string;
   timeLimit: number;
-  question_type: "multiple_choice" | "true_false"; // Thêm loại câu hỏi
+  question_type: "multiple_choice" | "true_false";
   answers: Answer[];
 }
 
@@ -45,7 +48,7 @@ interface QuizState {
   questions: Question[];
 }
 
-// Khởi tạo mặc định với 1 câu Multiple Choice
+// Khởi tạo mặc định
 const INITIAL_QUIZ: QuizState = {
   title: "",
   category: "it",
@@ -75,6 +78,10 @@ export default function CreateQuizPage() {
     quiz.questions[0].id,
   );
   const [isPublishing, setIsPublishing] = useState(false);
+
+  // Responsive Sidebar States
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
 
   const activeQuestion =
     quiz.questions.find((q) => q.id === activeQuestionId) || quiz.questions[0];
@@ -139,6 +146,11 @@ export default function CreateQuizPage() {
       questions: [...prev.questions, newQuestion],
     }));
     setActiveQuestionId(newId);
+
+    // Tự động đóng sidebar trên mobile khi thêm câu hỏi mới
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      setIsLeftSidebarOpen(false);
+    }
   };
 
   const deleteQuestion = (e: React.MouseEvent, id: string) => {
@@ -199,9 +211,8 @@ export default function CreateQuizPage() {
           })),
         };
 
-        // LƯU Ý: Đổi đường dẫn này nếu API tạo câu hỏi của Backend team khác nhé!
         return fetchWithAuth(
-          `http://127.0.0.1:8000/api/v1/quizzes/${newQuizId}/questions`,
+          `${apiUrl}/api/v1/quizzes/${newQuizId}/questions`,
           {
             method: "POST",
             body: JSON.stringify(questionPayload),
@@ -211,7 +222,6 @@ export default function CreateQuizPage() {
 
       await Promise.all(questionPromises);
 
-      // Hoàn tất
       alert("🎉 Xuất bản Quiz và câu hỏi thành công!");
       router.push("/quizzes");
     } catch (error) {
@@ -220,21 +230,33 @@ export default function CreateQuizPage() {
     } finally {
       setIsPublishing(false);
     }
-  }
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 font-sans">
-      <header className="fixed top-0 left-0 w-full h-16 bg-white border-b border-slate-200 z-50 flex justify-between items-center px-6">
-        <button
-          onClick={() => router.push("/quizzes")}
-          className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors font-bold text-sm"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Library
-        </button>
+      {/* --- HEADER --- */}
+      <header className="fixed top-0 left-0 w-full h-16 bg-white border-b border-slate-200 z-50 flex justify-between items-center px-4 md:px-6">
+        <div className="flex items-center gap-2">
+          {/* Mobile menu button for left sidebar */}
+          <button
+            onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg text-slate-700"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
 
-        <div className="flex-1 max-w-lg mx-auto">
+          <button
+            onClick={() => router.push("/quizzes")}
+            className="hidden sm:flex items-center gap-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors font-bold text-sm"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="hidden md:inline">Library</span>
+          </button>
+        </div>
+
+        <div className="flex-1 max-w-xs md:max-w-lg mx-auto">
           <input
-            className="w-full bg-transparent border-none text-center font-display text-2xl font-black text-slate-900 placeholder:text-slate-300 focus:ring-0 rounded-lg p-2 outline-none"
+            className="w-full bg-transparent border-none text-center font-display text-lg md:text-2xl font-black text-slate-900 placeholder:text-slate-300 focus:ring-0 rounded-lg p-2 outline-none"
             value={quiz.title}
             onChange={(e) =>
               setQuiz((prev) => ({ ...prev, title: e.target.value }))
@@ -243,32 +265,60 @@ export default function CreateQuizPage() {
           />
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
+          <button className="hidden sm:flex px-4 py-2 rounded-xl border-2 border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-100 transition-colors items-center gap-2 shadow-sm">
+            <Save className="w-4 h-4" />
+            <span className="hidden md:inline">Save</span>
+          </button>
+
           <button
             onClick={handlePublish}
             disabled={isPublishing}
-            className="bg-yellow-400 text-yellow-950 px-6 py-2 rounded-xl font-bold text-sm shadow-[0px_4px_0px_0px_#b45309] hover:bg-yellow-500 active:translate-y-1 active:shadow-none transition-all flex items-center gap-2 disabled:opacity-50"
+            className="bg-yellow-400 text-yellow-950 px-4 md:px-6 py-2 rounded-xl font-bold text-sm shadow-[0px_4px_0px_0px_#b45309] hover:bg-yellow-500 active:translate-y-1 active:shadow-none transition-all flex items-center gap-2 disabled:opacity-50"
           >
             {isPublishing ? (
               <div className="w-4 h-4 border-2 border-yellow-950 border-t-transparent rounded-full animate-spin"></div>
             ) : (
               <UploadCloud className="w-4 h-4" />
             )}
-            {isPublishing ? "Saving..." : "Save Quiz"}
+            <span className="hidden md:inline">
+              {isPublishing ? "Saving..." : "Save Quiz"}
+            </span>
+          </button>
+
+          {/* Mobile settings button for right sidebar */}
+          <button
+            onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+            className="lg:hidden p-2 hover:bg-slate-100 rounded-lg text-slate-700"
+          >
+            <Settings className="w-6 h-6" />
           </button>
         </div>
       </header>
 
-      <main className="flex-1 flex pt-16 overflow-hidden">
+      {/* --- MAIN CONTENT --- */}
+      <main className="flex-1 flex pt-16 overflow-hidden relative">
         {/* LETS SIDEBAR: CÂU HỎI */}
-        <aside className="w-72 bg-slate-100 border-r border-slate-200 flex flex-col shrink-0">
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 w-72 bg-slate-100 border-r border-slate-200 flex flex-col shrink-0 transition-transform duration-300 lg:static lg:translate-x-0 ${
+            isLeftSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } pt-16 lg:pt-0`}
+        >
           <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
             <h2 className="font-display text-xl font-black text-slate-800">
               Questions
             </h2>
-            <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-bold text-xs">
-              {quiz.questions.length}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-bold text-xs">
+                {quiz.questions.length}
+              </span>
+              <button
+                onClick={() => setIsLeftSidebarOpen(false)}
+                className="lg:hidden p-1 hover:bg-slate-100 rounded-full text-slate-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3 hide-scrollbar">
@@ -280,7 +330,15 @@ export default function CreateQuizPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   key={q.id}
-                  onClick={() => setActiveQuestionId(q.id)}
+                  onClick={() => {
+                    setActiveQuestionId(q.id);
+                    if (
+                      typeof window !== "undefined" &&
+                      window.innerWidth < 1024
+                    ) {
+                      setIsLeftSidebarOpen(false);
+                    }
+                  }}
                   className={`relative p-3 rounded-xl cursor-pointer shadow-sm transition-all border-2 ${
                     activeQuestionId === q.id
                       ? "bg-white border-indigo-500 shadow-md ring-2 ring-indigo-200"
@@ -289,7 +347,11 @@ export default function CreateQuizPage() {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <span
-                      className={`font-black text-xs px-2 py-1 rounded-md ${activeQuestionId === q.id ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}
+                      className={`font-black text-xs px-2 py-1 rounded-md ${
+                        activeQuestionId === q.id
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
                     >
                       Q{q.number} •{" "}
                       {q.question_type === "true_false" ? "T/F" : "Quiz"}
@@ -302,7 +364,11 @@ export default function CreateQuizPage() {
                     </button>
                   </div>
                   <p
-                    className={`text-sm line-clamp-2 font-medium mt-2 ${activeQuestionId === q.id ? "text-slate-800" : "text-slate-500"}`}
+                    className={`text-sm line-clamp-2 font-medium mt-2 ${
+                      activeQuestionId === q.id
+                        ? "text-slate-800"
+                        : "text-slate-500"
+                    }`}
                   >
                     {q.text || "Câu hỏi chưa có nội dung..."}
                   </p>
@@ -328,18 +394,29 @@ export default function CreateQuizPage() {
           </div>
         </aside>
 
+        {/* OVERLAY KHI MỞ MENU MOBILE */}
+        {(isLeftSidebarOpen || isRightSidebarOpen) && (
+          <div
+            onClick={() => {
+              setIsLeftSidebarOpen(false);
+              setIsRightSidebarOpen(false);
+            }}
+            className="fixed inset-0 bg-slate-900/40 z-30 lg:hidden backdrop-blur-sm"
+          />
+        )}
+
         {/* CENTER: EDITOR */}
-        <section className="flex-1 overflow-y-auto bg-slate-50 p-8 flex flex-col items-center">
+        <section className="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8 flex flex-col items-center">
           <motion.div
             key={activeQuestionId}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-3xl space-y-8"
+            className="w-full max-w-3xl space-y-6 md:space-y-8"
           >
             {/* Question Text */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border-2 border-slate-200">
+            <div className="bg-white rounded-3xl p-4 md:p-6 shadow-sm border-2 border-slate-200">
               <div className="flex justify-between items-center mb-4">
-                <span className="font-display text-2xl font-black text-indigo-900">
+                <span className="font-display text-xl md:text-2xl font-black text-indigo-900">
                   Question {activeQuestion.number}
                 </span>
                 <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
@@ -360,7 +437,7 @@ export default function CreateQuizPage() {
                 </div>
               </div>
               <textarea
-                className="w-full bg-slate-50 border-2 border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-2xl p-4 text-xl font-bold text-slate-800 resize-none min-h-[140px] placeholder:text-slate-300 outline-none transition-all"
+                className="w-full bg-slate-50 border-2 border-slate-200 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 rounded-2xl p-4 text-base md:text-xl font-bold text-slate-800 resize-none min-h-[100px] md:min-h-[140px] placeholder:text-slate-300 outline-none transition-all"
                 placeholder="Nhập nội dung câu hỏi..."
                 value={activeQuestion.text}
                 onChange={(e) => updateQuestion({ text: e.target.value })}
@@ -369,7 +446,11 @@ export default function CreateQuizPage() {
 
             {/* HIỂN THỊ ĐÁP ÁN DỰA VÀO LOẠI CÂU HỎI */}
             <div
-              className={`grid gap-4 ${activeQuestion.question_type === "true_false" ? "grid-cols-2 max-w-lg mx-auto" : "grid-cols-1 md:grid-cols-2"}`}
+              className={`grid gap-4 ${
+                activeQuestion.question_type === "true_false"
+                  ? "grid-cols-2 max-w-lg mx-auto"
+                  : "grid-cols-1 md:grid-cols-2"
+              }`}
             >
               {activeQuestion.answers.map((answer) => (
                 <div
@@ -392,7 +473,7 @@ export default function CreateQuizPage() {
                     </span>
                     <button
                       onClick={() => setCorrectAnswer(answer.id)}
-                      className={`flex items-center gap-1 font-bold text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                      className={`flex items-center gap-1 font-bold text-xs md:text-sm px-3 py-1.5 rounded-lg transition-colors ${
                         answer.isCorrect
                           ? "text-green-700 bg-green-200/50"
                           : "text-slate-400 hover:text-green-600 hover:bg-green-50"
@@ -407,13 +488,16 @@ export default function CreateQuizPage() {
                     </button>
                   </div>
 
-                  {/* Khóa ô input nếu là câu hỏi True/False */}
                   <input
-                    className={`w-full rounded-xl p-3 text-lg font-bold outline-none border-2 transition-all ${
+                    className={`w-full rounded-xl p-3 text-base md:text-lg font-bold outline-none border-2 transition-all ${
                       answer.isCorrect
                         ? "bg-white border-green-200 text-green-900 focus:border-green-500"
                         : "bg-slate-50 border-transparent text-slate-800 focus:border-indigo-300 focus:bg-white"
-                    } ${activeQuestion.question_type === "true_false" ? "cursor-not-allowed opacity-80" : ""}`}
+                    } ${
+                      activeQuestion.question_type === "true_false"
+                        ? "cursor-not-allowed opacity-80"
+                        : ""
+                    }`}
                     type="text"
                     value={answer.text}
                     onChange={(e) => updateAnswer(answer.id, e.target.value)}
@@ -427,10 +511,22 @@ export default function CreateQuizPage() {
         </section>
 
         {/* RIGHT SIDEBAR: Settings */}
-        <aside className="w-72 bg-white border-l border-slate-200 p-6 flex flex-col gap-6 overflow-y-auto shrink-0">
-          <h3 className="font-display text-xl font-black text-slate-800 border-b-2 border-slate-100 pb-4">
-            Quiz Settings
-          </h3>
+        <aside
+          className={`fixed inset-y-0 right-0 z-40 w-72 bg-white border-l border-slate-200 p-6 flex flex-col gap-6 overflow-y-auto shrink-0 transition-transform duration-300 lg:static lg:translate-x-0 ${
+            isRightSidebarOpen ? "translate-x-0" : "translate-x-full"
+          } pt-16 lg:pt-0`}
+        >
+          <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4">
+            <h3 className="font-display text-xl font-black text-slate-800">
+              Quiz Settings
+            </h3>
+            <button
+              onClick={() => setIsRightSidebarOpen(false)}
+              className="lg:hidden p-1 hover:bg-slate-100 rounded-full text-slate-500"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
           <div className="space-y-2">
             <label className="font-bold text-sm text-slate-500 flex items-center gap-2">
@@ -438,7 +534,9 @@ export default function CreateQuizPage() {
             </label>
             <div className="flex items-center justify-between bg-slate-50 border-2 border-slate-200 rounded-xl p-3">
               <span
-                className={`font-bold text-sm ${quiz.isPublic ? "text-indigo-600" : "text-slate-500"}`}
+                className={`font-bold text-sm ${
+                  quiz.isPublic ? "text-indigo-600" : "text-slate-500"
+                }`}
               >
                 {quiz.isPublic ? "Public" : "Private"}
               </span>
@@ -446,10 +544,14 @@ export default function CreateQuizPage() {
                 onClick={() =>
                   setQuiz((prev) => ({ ...prev, isPublic: !prev.isPublic }))
                 }
-                className={`w-12 h-6 rounded-full transition-colors relative shadow-inner ${quiz.isPublic ? "bg-indigo-600" : "bg-slate-300"}`}
+                className={`w-12 h-6 rounded-full transition-colors relative shadow-inner ${
+                  quiz.isPublic ? "bg-indigo-600" : "bg-slate-300"
+                }`}
               >
                 <div
-                  className={`w-4 h-4 bg-white rounded-full absolute top-1 shadow-sm transition-transform ${quiz.isPublic ? "translate-x-7" : "translate-x-1"}`}
+                  className={`w-4 h-4 bg-white rounded-full absolute top-1 shadow-sm transition-transform ${
+                    quiz.isPublic ? "translate-x-7" : "translate-x-1"
+                  }`}
                 />
               </button>
             </div>

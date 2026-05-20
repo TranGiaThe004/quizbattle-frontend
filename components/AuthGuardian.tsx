@@ -3,18 +3,22 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+// --- DANH SÁCH TRẮNG: Các trang mở cửa tự do ---
+const PUBLIC_ROUTES = [
+  "/", // Trang chủ
+  "/login", // Đăng nhập
+  "/register", // Đăng ký
+];
+
 // Hàm giải mã JWT siêu nhẹ bằng Javascript thuần
 const isTokenAboutToExpire = (token: string) => {
   try {
-    // Tách lấy phần payload của JWT (nằm giữa 2 dấu chấm)
     const payload = JSON.parse(atob(token.split(".")[1]));
-    const expirationTime = payload.exp * 1000; // Đổi thời gian hết hạn sang mili-giây
+    const expirationTime = payload.exp * 1000;
     const currentTime = Date.now();
-
-    // Nếu token sẽ hết hạn trong vòng 1 PHÚT tới (hoặc đã hết hạn) -> Trả về true để xin mới
     return expirationTime - currentTime < 60 * 1000;
   } catch (e) {
-    return true; // Nếu lỗi giải mã thì coi như hỏng, bắt xin mới luôn
+    return true;
   }
 };
 
@@ -28,23 +32,23 @@ export default function AuthGuardian({
 
   useEffect(() => {
     const checkAndRefreshToken = async () => {
-      // 1. Bỏ qua không kiểm tra nếu đang ở trang Login hoặc Register
-      if (pathname.startsWith("/login") || pathname.startsWith("/register"))
-        return;
+      // Xác định xem trang hiện tại có phải là trang Public không
+      // Dùng startsWith cho phép các route con như /rooms/join cũng được tính là Public
+      const isPublicPage =
+        PUBLIC_ROUTES.includes(pathname) || pathname.startsWith("/rooms/join");
 
       const accessToken = localStorage.getItem("access_token");
       const refreshToken = localStorage.getItem("refresh_token");
 
       if (!accessToken || !refreshToken) {
-        // Nếu không có token mà đòi vào các trang bảo mật (như dashboard, quizzes) -> Đuổi ra
-        if (pathname !== "/") {
-          // Giả sử trang chủ "/" cho phép khách xem
+        // Nếu không có token mà đòi vào trang Private -> Đuổi ra Login
+        if (!isPublicPage) {
           router.push("/login");
         }
-        return;
+        return; // Đang ở trang Public thì cứ return để cho xem bình thường
       }
 
-      // 2. LỚP BẢO VỆ: Kiểm tra hạn sử dụng ngay lúc người dùng vừa bấm chuyển trang
+      // LỚP BẢO VỆ: Kiểm tra hạn sử dụng khi có token
       if (isTokenAboutToExpire(accessToken)) {
         console.log("🛡️ Guardian: Token sắp/đã hết hạn. Đang xin cấp lại...");
         try {
@@ -64,10 +68,15 @@ export default function AuthGuardian({
             }
             console.log("✅ Guardian: Làm mới Token thành công!");
           } else {
-            // Refresh Token cũng đã hết hạn (quá 7 ngày chẳng hạn) -> Đăng xuất
+            // Token rác/hết hạn -> Dọn dẹp sạch sẽ
             localStorage.removeItem("access_token");
             localStorage.removeItem("refresh_token");
-            router.push("/login");
+            localStorage.removeItem("display_name");
+
+            // [ĐÃ FIX]: CHỈ ĐUỔI RA LOGIN NẾU ĐANG LÉN VÀO TRANG PRIVATE
+            if (!isPublicPage) {
+              router.push("/login");
+            }
           }
         } catch (error) {
           console.error("Lỗi khi refresh token ở Guardian:", error);
@@ -76,7 +85,7 @@ export default function AuthGuardian({
     };
 
     checkAndRefreshToken();
-  }, [pathname, router]); // Hook này chỉ kích hoạt khi "pathname" (URL) thay đổi
+  }, [pathname, router]);
 
   return <>{children}</>;
 }

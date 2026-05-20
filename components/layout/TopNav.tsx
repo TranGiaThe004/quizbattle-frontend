@@ -9,15 +9,49 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [displayName, setDisplayName] = useState("Bạn");
 
   useEffect(() => {
-    // Kiểm tra trạng thái đăng nhập khi load trang
     const token = localStorage.getItem("access_token");
     setIsLoggedIn(!!token);
+
+    if (token) {
+      const savedName = localStorage.getItem("display_name");
+
+      if (savedName) {
+        setDisplayName(savedName);
+      } else {
+        // 🚀 NẾU CÓ TOKEN NHƯNG CHƯA CÓ TÊN: Chủ động gọi API lấy thông tin profile
+        const fetchUserProfile = async () => {
+          try {
+            const apiUrl =
+              process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+            const response = await fetch(`${apiUrl}/api/v1/auth/me`, {
+              // Hoặc endpoint profile của team bạn
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (response.ok) {
+              const resData = await response.json();
+              const actualName =
+                resData.data?.username || resData.username || "Thành viên";
+
+              // Lưu vào cả State lẫn LocalStorage để lần sau không phải gọi lại API nữa
+              setDisplayName(actualName);
+              localStorage.setItem("display_name", actualName);
+            }
+          } catch (err) {
+            console.error("Không lấy được profile:", err);
+          }
+        };
+
+        fetchUserProfile();
+      }
+    }
   }, [pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
+    localStorage.removeItem("display_name"); // Xóa luôn tên để dọn dẹp sạch sẽ
     setIsLoggedIn(false);
     router.push("/login");
   };
@@ -58,11 +92,19 @@ export default function Header() {
       <div className="flex items-center gap-4">
         {isLoggedIn ? (
           <>
+            {/* --- PHẦN THÊM MỚI: XIN CHÀO & AVATAR --- */}
+            <div className="flex items-center gap-3 mr-2">
+              <span className="font-bold text-sm text-slate-500 hidden sm:block">
+                Xin chào, <span className="text-indigo-600">{displayName}</span>
+              </span>
+            </div>
+            {/* -------------------------------------- */}
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ y: 2 }}
               onClick={() => router.push("/dashboard")}
-              className="hidden md:flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm hover:bg-indigo-700 transition-colors"
+              className="hidden md:flex items-center gap-2 bg-indigo-600 text-white px-5 py-2 rounded-full font-bold text-sm hover:bg-indigo-700 transition-colors"
             >
               <LayoutDashboard size={18} /> Dashboard
             </motion.button>
@@ -88,7 +130,7 @@ export default function Header() {
               Log In
             </button>
             <button
-              onClick={() => router.push("/register")}
+              onClick={() => router.push("/login?tab=signup")}
               className="font-bold bg-yellow-400 text-yellow-950 px-6 py-2 rounded-full shadow-md hover:bg-yellow-500 transition-colors"
             >
               Sign Up

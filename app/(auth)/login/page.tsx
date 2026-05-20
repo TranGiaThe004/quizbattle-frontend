@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Mail, Lock, EyeOff, Eye, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mail, Lock, EyeOff, Eye, ArrowRight, User } from "lucide-react";
 
 interface LoginResponse {
   tokens?: { access_token: string; refresh_token: string; token_type: string };
@@ -23,18 +23,33 @@ export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const [showPw, setShowPw] = useState(false);
 
+  useEffect(() => {
+    // Đọc tham số trên thanh địa chỉ URL
+    const params = new URLSearchParams(window.location.search);
+    // Nếu thấy có chữ tab=signup thì tự động gạt sang tab Đăng ký
+    if (params.get("tab") === "signup") {
+      setActiveTab("signup");
+    }
+  }, []);
+
+  // --- FORM STATES ---
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  // ==========================================
+  // LOGIC 1: XỬ LÝ ĐĂNG NHẬP
+  // ==========================================
+  async function handleLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
+      // API Login thường dùng form-urlencoded
       const formData = new URLSearchParams();
       formData.append("username", email);
       formData.append("password", password);
@@ -57,16 +72,11 @@ export default function LoginPage() {
       }
 
       const data: LoginResponse = await res.json();
-
       const accessToken = data.tokens?.access_token || data.access_token;
       const refreshToken = data.tokens?.refresh_token || data.refresh_token;
 
-      if (accessToken) {
-        localStorage.setItem("access_token", accessToken);
-      }
-      if (refreshToken) {
-        localStorage.setItem("refresh_token", refreshToken);
-      }
+      if (accessToken) localStorage.setItem("access_token", accessToken);
+      if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
 
       router.push("/dashboard");
     } catch (err: unknown) {
@@ -76,9 +86,53 @@ export default function LoginPage() {
     }
   }
 
+  // ==========================================
+  // LOGIC 2: XỬ LÝ ĐĂNG KÝ
+  // ==========================================
+  async function handleRegister(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      // API Register thường dùng JSON
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1/auth/register`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, email, password }),
+        },
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(
+          data.detail ||
+            "Đăng ký thất bại. Email hoặc Username có thể đã tồn tại.",
+        );
+      }
+
+      // Đăng ký thành công -> Thông báo và tự động chuyển về Tab Login
+      alert("Đăng ký thành công! Vui lòng đăng nhập.");
+      setPassword(""); // Xóa mật khẩu cho an toàn
+      setActiveTab("login");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Có lỗi hệ thống xảy ra.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Chuyển Tab (Clear lỗi khi chuyển)
+  const switchTab = (tab: "login" | "signup") => {
+    setActiveTab(tab);
+    setError(null);
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary-container to-[#5a00c6]">
-      {/* Brand Title (Thu nhỏ size chữ) */}
       <motion.h1
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -87,16 +141,16 @@ export default function LoginPage() {
         QuizBattle
       </motion.h1>
 
-      {/* Main Card (Giảm max-width từ 500px xuống 400px) */}
       <motion.main
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-[400px] bg-surface rounded-2xl shadow-tactile border-2 border-[#eaddff] overflow-hidden z-10 mt-8"
       >
-        {/* Tabs (Giảm padding và size chữ) */}
+        {/* TABS CỦA BẠN */}
         <div className="flex bg-[#e9e5ff] border-b-2 border-outline-variant">
           <button
-            onClick={() => setActiveTab("login")}
+            type="button"
+            onClick={() => switchTab("login")}
             className={`flex-1 py-3 text-center font-headline text-lg font-bold transition-all ${
               activeTab === "login"
                 ? "bg-surface text-primary border-b-4 border-primary"
@@ -106,7 +160,8 @@ export default function LoginPage() {
             Login
           </button>
           <button
-            onClick={() => setActiveTab("signup")}
+            type="button"
+            onClick={() => switchTab("signup")}
             className={`flex-1 py-3 text-center font-headline text-lg font-bold transition-all ${
               activeTab === "signup"
                 ? "bg-surface text-primary border-b-4 border-primary"
@@ -117,19 +172,19 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Card Body (Giảm padding tổng thể) */}
         <div className="p-6 md:p-8 space-y-5">
-          {/* Welcome Text */}
+          {/* WELCOME TEXT THAY ĐỔI THEO TAB */}
           <div className="text-center space-y-1.5">
             <h2 className="font-headline text-2xl font-extrabold">
-              Welcome Back!
+              {activeTab === "login" ? "Welcome Back!" : "Create Account"}
             </h2>
             <p className="text-sm text-on-surface-variant">
-              Ready to claim your spot on the leaderboard?
+              {activeTab === "login"
+                ? "Ready to claim your spot on the leaderboard?"
+                : "Join the ultimate quiz experience today."}
             </p>
           </div>
 
-          {/* Hiển thị Lỗi */}
           {error && (
             <div className="bg-error-container text-on-error-container p-2.5 rounded-lg flex items-center gap-2 text-xs font-bold animate-pulse">
               <span className="w-4 h-4 bg-error text-white rounded-full flex items-center justify-center text-[10px]">
@@ -139,20 +194,47 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form (Giảm khoảng cách giữa các field) */}
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          {/* FORM GỌI HÀM LINH HOẠT THEO TAB */}
+          <form
+            className="space-y-4"
+            onSubmit={activeTab === "login" ? handleLogin : handleRegister}
+          >
+            {/* TRƯỜNG USERNAME CHỈ HIỆN KHI Ở TAB SIGNUP */}
+            <AnimatePresence>
+              {activeTab === "signup" && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="space-y-1 overflow-hidden"
+                >
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline-variant" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      disabled={loading}
+                      required={activeTab === "signup"}
+                      placeholder="Tên hiển thị của bạn"
+                      className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border-2 border-outline-variant rounded-lg focus:outline-none focus:border-primary transition-all font-medium disabled:opacity-50"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Email */}
             <div className="space-y-1">
-              <label
-                htmlFor="email"
-                className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant"
-              >
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                 Email Address
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-outline-variant" />
                 <input
-                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -167,7 +249,6 @@ export default function LoginPage() {
             {/* Password */}
             <div className="space-y-1">
               <label
-                htmlFor="password"
                 className={`block text-[10px] font-bold uppercase tracking-wider ${error ? "text-error" : "text-on-surface-variant"}`}
               >
                 Password
@@ -177,12 +258,12 @@ export default function LoginPage() {
                   className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${error ? "text-error" : "text-outline-variant"}`}
                 />
                 <input
-                  id="password"
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
                   required
+                  minLength={6}
                   placeholder="••••••••"
                   className={`w-full pl-9 pr-10 py-2.5 text-sm rounded-lg focus:outline-none transition-all font-medium border-2 disabled:opacity-50 ${
                     error
@@ -194,7 +275,6 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPw(!showPw)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 focus:outline-none hover:text-primary transition-colors"
-                  aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                 >
                   {showPw ? (
                     <Eye
@@ -209,22 +289,24 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Forgot Link */}
-            <div className="flex justify-end">
-              <a
-                href="#"
-                className="text-primary text-xs font-bold hover:underline"
-              >
-                Forgot Password?
-              </a>
-            </div>
+            {/* Forgot Link (Chỉ hiện lúc Login) */}
+            {activeTab === "login" && (
+              <div className="flex justify-end">
+                <a
+                  href="#"
+                  className="text-primary text-xs font-bold hover:underline"
+                >
+                  Forgot Password?
+                </a>
+              </div>
+            )}
 
-            {/* Login Button (Thu gọn padding, icon và text) */}
+            {/* SUBMIT BUTTON */}
             <motion.button
               type="submit"
               disabled={loading}
               whileTap={!loading ? { y: 2, boxShadow: "none" } : {}}
-              className={`w-full py-3 font-headline text-lg font-bold rounded-lg shadow-button uppercase tracking-tight flex items-center justify-center gap-2 transition-all ${
+              className={`w-full py-3 font-headline text-lg font-bold rounded-lg shadow-button uppercase tracking-tight flex items-center justify-center gap-2 transition-all mt-2 ${
                 loading
                   ? "bg-outline-variant text-on-surface-variant cursor-not-allowed"
                   : "bg-secondary text-on-secondary hover:brightness-110"
@@ -233,17 +315,18 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-4 border-t-white border-on-surface-variant rounded-full animate-spin"></div>
-                  Logging in...
+                  {activeTab === "login" ? "Logging in..." : "Signing up..."}
                 </>
               ) : (
                 <>
-                  Login <ArrowRight className="w-5 h-5" strokeWidth={3} />
+                  {activeTab === "login" ? "Login" : "Sign Up"}{" "}
+                  <ArrowRight className="w-5 h-5" strokeWidth={3} />
                 </>
               )}
             </motion.button>
           </form>
 
-          {/* Divider */}
+          {/* Social (Giữ nguyên) */}
           <div className="relative flex items-center py-1">
             <div className="flex-grow border-t-2 border-outline-variant"></div>
             <span className="flex-shrink mx-3 text-[10px] font-bold uppercase text-on-surface-variant tracking-wider">
@@ -252,7 +335,6 @@ export default function LoginPage() {
             <div className="flex-grow border-t-2 border-outline-variant"></div>
           </div>
 
-          {/* Social (Thu gọn nút social) */}
           <div className="grid grid-cols-2 gap-3">
             <SocialButton icon="google" label="Google" disabled={loading} />
             <SocialButton icon="apple" label="Apple" disabled={loading} />
@@ -274,6 +356,7 @@ function SocialButton({
 }) {
   return (
     <button
+      type="button"
       disabled={disabled}
       className="flex items-center justify-center gap-2 py-2.5 bg-white border-2 border-outline-variant rounded-lg hover:bg-[#f6f2ff] transition-all active:scale-95 font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed"
     >
